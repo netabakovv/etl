@@ -46,29 +46,29 @@ def replicate():
     cur = pg.cursor()
 
     cur.execute("""
-                SELECT id, name, email
-                FROM customers
-                WHERE created_at > %s
-                """, (last_sync,))
+        SELECT id, name, email
+        FROM customers
+        WHERE created_at > %s
+    """, (last_sync,))
     customers = cur.fetchall()
 
     cur.execute("""
-                SELECT
-                    o.id,
-                    o.customer_id,
-                    o.status,
-                    o.created_at,
-                    o.updated_at,
-                    o.deleted_at,
-                    p.id,
-                    p.name,
-                    op.amount
-                FROM orders o
-                         JOIN order_products op ON op.order_id = o.id
-                         JOIN products p ON p.id = op.product_id
-                WHERE o.updated_at > %s
-                   OR o.deleted_at IS NOT NULL
-                """, (last_sync,))
+        SELECT 
+            o.id,
+            o.customer_id,
+            o.status,
+            o.created_at,
+            o.updated_at,
+            o.deleted_at,
+            p.id,
+            p.name,
+            op.amount
+        FROM orders o
+        JOIN order_products op ON op.order_id = o.id
+        JOIN products p ON p.id = op.product_id
+        WHERE o.updated_at > %s
+           OR o.deleted_at IS NOT NULL
+    """, (last_sync,))
     rows = cur.fetchall()
 
     for c in customers:
@@ -97,6 +97,7 @@ def replicate():
                 "customer_id": r[1],
                 "status": r[2],
                 "placed_at": r[3],
+                "updated_at": r[4],
                 "deleted_at": r[5],
                 "products": []
             }
@@ -108,12 +109,28 @@ def replicate():
         })
 
     for order in orders_map.values():
-        mdb.customers.update_one(
-            {"_id": order["customer_id"]},
-            {
-                "$addToSet": {"orders": order}
-            }
-        )
+        customer_id = order["customer_id"]
+
+        if order["deleted_at"] is not None:
+            mdb.customers.update_one(
+                {"_id": customer_id},
+                {
+                    "$pull": {"orders": {"order_id": order["order_id"]}}
+                }
+            )
+        else:
+            mdb.customers.update_one(
+                {"_id": customer_id},
+                {
+                    "$pull": {"orders": {"order_id": order["order_id"]}}
+                }
+            )
+            mdb.customers.update_one(
+                {"_id": customer_id},
+                {
+                    "$push": {"orders": order}
+                }
+            )
 
     now = datetime.utcnow().isoformat()
     save_last_sync(now)
