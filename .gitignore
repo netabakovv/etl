@@ -1,0 +1,9 @@
+.env
+state.json
+.venv/
+__pycache__/
+*.py[cod]
+.idea/
+*.iml
+.codegraph/
+

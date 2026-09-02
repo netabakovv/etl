@@ -7,7 +7,7 @@ import time
 from dotenv import load_dotenv
 
 load_dotenv()
-STATE_FILE = "state.json"
+STATE_FILE = os.getenv("STATE_FILE", "state.json")
 
 def get_env(name, default=None):
     value = os.getenv(name, default)
@@ -139,10 +139,14 @@ def replicate():
 
 
 if __name__ == "__main__":
-    while True:
-        try:
-            replicate()
-        except Exception as e:
-            print("ERROR:", e)
+    try:
+        while True:
+            try:
+                replicate()
+            except Exception as e:
+                print("ERROR:", e)
 
-        time.sleep(SYNC_INTERVAL)
+            time.sleep(SYNC_INTERVAL)
+    finally:
+        pg.close()
+        mongo.close()
